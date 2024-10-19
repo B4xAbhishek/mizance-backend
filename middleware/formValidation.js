@@ -3,16 +3,15 @@ const { body, validationResult } = require('express-validator');
 exports.validateForm = [
   body('name').notEmpty().withMessage('Name is required'),
   body('email').isEmail().withMessage('Invalid email'),
-  body('date').isISO8601().withMessage('Invalid date'),
-  body('budget').isNumeric().withMessage('Budget must be a number'),
+
+  // Convert the date string to a Date object
+  body('date').isISO8601().toDate().withMessage('Invalid date'),
+
+  // Convert the budget string to a number
+  body('budget').isNumeric().toFloat().withMessage('Budget must be a number'),
 
   // Optional validation for attachment (if provided)
-  body('attachment').optional().custom((value, { req }) => {
-    if (value && typeof value !== 'object') {
-      throw new Error('Attachment must be an object');
-    }
-    return true;
-  }),
+  body('attachment').optional(),
 
   (req, res, next) => {
     const errors = validationResult(req);
