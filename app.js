@@ -39,6 +39,7 @@ const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Routes
+
 const formRoutes = require('./routes/formRoutes');
 app.use('/api/forms', formRoutes); // Mount the form routes
 
@@ -55,6 +56,10 @@ const dropdownOptions = [
     res.json({ success: true, data: dropdownOptions });
   });
 
+  app.get("/", (  req, res) => {
+    res.send("API health ok")
+  })
+  
 // Get the port from environment variables or use default port 5000
 const PORT = process.env.PORT || 5000;
 
