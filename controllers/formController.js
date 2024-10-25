@@ -1,29 +1,76 @@
 const Form = require('../model/formModel');
 const nodemailer = require('nodemailer');
-const path = require('path'); // For working with file paths
+const path = require('path');
 
-// Create transporter object using SMTP settings (e.g., Gmail)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,  // Your email from .env
-    pass: process.env.EMAIL_PASS   // Your email password from .env
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 });
 
-// Function to send email
 const sendMail = async (formData, attachmentPath) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
-    to: 'b4xabhishek@gmail',  // Replace with your email address
-    subject: 'Form Submission Success',
-    text: `Form submitted successfully!\n\nDetails:\nName: ${formData.name}\nEmail: ${formData.email}\nDate: ${formData.date}\nBudget: ${formData.budget}`,
-    html: `<h1>Form Submitted Successfully</h1>
-           <p><strong>Name:</strong> ${formData.name}</p>
-           <p><strong>Email:</strong> ${formData.email}</p>
-           <p><strong>Date:</strong> ${formData.date}</p>
-           <p><strong>Budget:</strong> ${formData.budget}</p>`,
-    // Attach file if present
+    to: 'b4xabhishek@gmail',
+    subject: 'New Project Inquiry',
+    text: `
+      New Project Inquiry Received!
+
+      Contact Details:
+      Name: ${formData.name}
+      Email: ${formData.email}
+      Phone: ${formData.phone}
+      Preferred Communication: ${formData.communicationMethod}
+      Preferred Contact Time: ${formData.contactTime}
+
+      Project Details:
+      Type: ${formData.projectType}
+      Description: ${formData.projectDescription}
+      Budget Range: $${formData.budgetRange}
+      Timeframe: ${formData.timeframe} months
+
+      Target Audience: ${formData.targetAudience}
+
+      Required Features:
+      ${formData.selectedFeatures.join('\n')}
+
+      Preferred Technologies:
+      ${formData.preferredTechStack.join('\n')}
+
+      Meeting Scheduled: ${new Date(formData.scheduledMeeting).toLocaleString()}
+    `,
+    html: `
+      <h1>New Project Inquiry Received!</h1>
+
+      <h2>Contact Details:</h2>
+      <p><strong>Name:</strong> ${formData.name}</p>
+      <p><strong>Email:</strong> ${formData.email}</p>
+      <p><strong>Phone:</strong> ${formData.phone}</p>
+      <p><strong>Preferred Communication:</strong> ${formData.communicationMethod}</p>
+      <p><strong>Preferred Contact Time:</strong> ${formData.contactTime}</p>
+
+      <h2>Project Details:</h2>
+      <p><strong>Type:</strong> ${formData.projectType}</p>
+      <p><strong>Description:</strong> ${formData.projectDescription}</p>
+      <p><strong>Budget Range:</strong> $${formData.budgetRange}</p>
+      <p><strong>Timeframe:</strong> ${formData.timeframe} months</p>
+
+      <p><strong>Target Audience:</strong> ${formData.targetAudience}</p>
+
+      <h2>Required Features:</h2>
+      <ul>
+        ${formData.selectedFeatures.map(feature => `<li>${feature}</li>`).join('')}
+      </ul>
+
+      <h2>Preferred Technologies:</h2>
+      <ul>
+        ${formData.preferredTechStack.map(tech => `<li>${tech}</li>`).join('')}
+      </ul>
+
+      <p><strong>Meeting Scheduled:</strong> ${new Date(formData.scheduledMeeting).toLocaleString()}</p>
+    `,
     attachments: attachmentPath ? [{
       filename: path.basename(attachmentPath),
       path: attachmentPath
@@ -33,36 +80,36 @@ const sendMail = async (formData, attachmentPath) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log('Email sent: ' + info.response);
+    return true;
   } catch (error) {
     console.error('Error sending email: ', error);
+    return false;
   }
 };
 
-// Controller for handling form submissions
 exports.submitForm = async (req, res) => {
   try {
-    const { name, email, date, budget } = req.body;
-    const attachment = req.file ? req.file.path : null;  // Get uploaded file path, if present
-
-    // Create a new form entry
-    const formData = new Form({
-      name,
-      email,
-      date,
-      budget,
-      attachment // Save the file path in the attachment field
-    });
+    // Create a new form entry with all fields from the payload
+    const formData = new Form(req.body);
 
     // Save the form data to the database
-    await formData.save();
+    const savedForm = await formData.save();
 
-    // Send a success email after form submission, with the attachment if present
-    await sendMail(formData, attachment);
+    // Send email
+    const emailSent = await sendMail(savedForm, savedForm.uploadedFile);
 
-    // Send response to the client
-    res.status(200).json({ message: 'Form submitted successfully and email sent' });
+    // Return both success message and saved form data
+    res.status(200).json({
+      message: 'Form submitted successfully',
+      emailStatus: emailSent ? 'Email sent successfully' : 'Email sending failed',
+      formData: savedForm
+    });
+
   } catch (error) {
     console.error('Error processing form submission:', error);
-    res.status(500).json({ message: 'Error submitting form', error });
+    res.status(500).json({ 
+      message: 'Error submitting form',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 };

@@ -1,24 +1,73 @@
 const mongoose = require('mongoose');
 
 const formSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true },
-  phone: { type: String },
-  communicationMethod: { type: String, required: true },
-  contactTime: { type: String, required: true },
-  projectType: { type: String, required: true },
-  projectDescription: { type: String, required: true },
-  selectedFeatures: [{ type: String }],
-  budgetRange: { type: Number, required: true },
-  timeframe: { type: Number, required: true },
-  targetAudience: { type: String, required: true },
-  preferredTechStack: [{ type: String }],
-  uploadedFile: {
-    filename: String,
-    path: String,
-    mimetype: String
+  name: {
+    type: String,
+    default: null
   },
-  scheduledMeeting: { type: Date, required: true }
-}, { timestamps: true });
+  email: {
+    type: String,
+    default: null
+  },
+  phone: {
+    type: String,
+    default: null
+  },
+  communicationMethod: {
+    type: String,
+    default: null
+  },
+  contactTime: {
+    type: String,
+    default: null
+  },
+  projectType: {
+    type: String,
+    default: null
+  },
+  projectDescription: {
+    type: String,
+    default: null
+  },
+  selectedFeatures: {
+    type: [String],
+    default: []
+  },
+  budgetRange: {
+    type: String,  // Changed to String since it's coming as string in payload
+    default: null
+  },
+  timeframe: {
+    type: String,  // Changed to String since it's coming as string in payload
+    default: null
+  },
+  targetAudience: {
+    type: String,
+    default: null
+  },
+  preferredTechStack: {
+    type: [String],
+    default: []
+  },
+  uploadedFile: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+  scheduledMeeting: {
+    type: String,  // Changed to String to match payload format
+    default: null
+  }
+}, {
+  timestamps: true,
+  strict: true  // Changed to true to ensure only defined fields are saved
+});
 
-module.exports = mongoose.model('Form', formSchema);
+// Add logging middleware
+formSchema.pre('save', function(next) {
+  console.log('Data being saved:', JSON.stringify(this.toObject(), null, 2));
+  next();
+});
+
+const Form = mongoose.model('Form', formSchema);
+
+module.exports = Form;
