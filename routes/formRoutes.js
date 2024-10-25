@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const formController = require('../controllers/formController');
-const formValidation = require('../middleware/formValidation');
-//const upload = require('../middleware/upload');  // Assuming you have middleware for file uploads
+const { validateForm } = require('../middleware/formValidation');
+const { submitForm } = require('../controllers/formController');
 
-// Route to handle form submission with file upload and validation
-router.post('/submit', formValidation.validateForm, formController.submitForm);
+router.post('/submit', validateForm, submitForm);
 
 module.exports = router;
