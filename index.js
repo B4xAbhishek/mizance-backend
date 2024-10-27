@@ -9,6 +9,13 @@ connectDB();
 
 const app = express();
 
+// CORS Configuration
+app.use(cors({
+  origin: '*', // Allow all origins - customize this in production!
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 // Middleware to parse JSON requests
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
