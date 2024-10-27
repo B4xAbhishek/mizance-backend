@@ -2,6 +2,7 @@ const express = require('express');
 const connectDB = require('./config/db');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const cors = require('cors')
 require('dotenv').config();
 
 // Connect to the database
@@ -14,11 +15,15 @@ app.use(cors({
   origin: '*', 
   methods: '*',
   allowedHeaders: '*',
+  credentials: true,
+  preflightContinue: true,
+  optionsSuccessStatus: 200
 }));
 
-// Middleware to parse JSON requests
+// Parse JSON bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 // Swagger configuration
 const swaggerOptions = {
