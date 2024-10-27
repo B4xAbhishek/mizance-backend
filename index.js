@@ -11,9 +11,9 @@ const app = express();
 
 // CORS Configuration
 app.use(cors({
-  origin: '*', // Allow all origins - customize this in production!
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: '*', 
+  methods: '*',
+  allowedHeaders: '*',
 }));
 
 // Middleware to parse JSON requests
