@@ -96,12 +96,12 @@ exports.submitForm = async (req, res) => {
     const savedForm = await formData.save();
 
     // Send email
-    const emailSent = await sendMail(savedForm, savedForm.uploadedFile);
+    //const emailSent = await sendMail(savedForm, savedForm.uploadedFile);
 
     // Return both success message and saved form data
     res.status(200).json({
       message: 'Form submitted successfully',
-      emailStatus: emailSent ? 'Email sent successfully' : 'Email sending failed',
+     // emailStatus: emailSent ? 'Email sent successfully' : 'Email sending failed',
       formData: savedForm
     });
 
