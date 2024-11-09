@@ -1,14 +1,14 @@
+// index.js
 const express = require('express');
-const connectDB = require('./config/db');
-const swaggerJsDoc = require('swagger-jsdoc');
-const swaggerUi = require('swagger-ui-express');
-const cors = require('cors')
+const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
+const multer = require('multer');
+const path = require('path');
+const cors = require('cors');
 require('dotenv').config();
 
-// Connect to the database
-connectDB();
-
 const app = express();
+app.use(express.json());
 
 // CORS Configuration
 app.use(cors({
@@ -20,62 +20,121 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Parse JSON bodies
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Database connection
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => {
+  console.log('Database connected');
+}).catch((error) => {
+  console.error('Database connection error:', error);
+});
 
+// Schema and model
+const formSchema = new mongoose.Schema({
+  name: { type: String, default: null },
+  email: { type: String, default: null },
+  phone: { type: String, default: null },
+  communicationMethod: { type: String, default: null },
+  contactTime: { type: String, default: null },
+  projectType: { type: String, default: null },
+  projectDescription: { type: String, default: null },
+  uploadedFile: { type: mongoose.Schema.Types.Mixed, default: null },
+}, { timestamps: true });
 
-// Swagger configuration
-const swaggerOptions = {
-  swaggerDefinition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Multi-Step Form API',
-      version: '1.0.0',
-      description: 'API for handling multi-step form submissions',
-      contact: {
-        name: 'Developer',
-        email: 'b4xabhishek@gmail.com'
-      },
-      servers: [
-        {
-          url: `http://localhost:${process.env.PORT || 5000}`, // Dynamic server URL based on your PORT
-        },
-      ],
-    },
-  },
-  apis: ['./routes/*.js'], // Path to the route files where Swagger documentation comments are added
+formSchema.pre('save', function (next) {
+  console.log('Data being saved:', JSON.stringify(this.toObject(), null, 2));
+  next();
+});
+
+const Form = mongoose.model('Form', formSchema);
+
+// File upload setup
+const upload = multer({ dest: 'uploads/' });
+
+// Nodemailer configuration
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+const sendMail = async (formData, attachmentPath) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: 'b4xabhishek@gmail.com',
+    subject: 'New Project Inquiry',
+    text: `
+      New Project Inquiry Received!
+
+      Contact Details:
+      Name: ${formData.name}
+      Email: ${formData.email}
+      Phone: ${formData.phone}
+      Preferred Communication: ${formData.communicationMethod}
+      Preferred Contact Time: ${formData.contactTime}
+
+      Project Details:
+      Type: ${formData.projectType}
+      Description: ${formData.projectDescription}
+
+    `,
+    attachments: attachmentPath ? [{
+      filename: path.basename(attachmentPath),
+      path: attachmentPath
+    }] : []
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent: ' + info.response);
+    return true;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return false;
+  }
 };
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+// Form submission endpoint
+app.post('/api/forms/submit', upload.single('uploadedFile'), async (req, res) => {
+  try {
+    const formData = new Form({
+      ...req.body,
+      uploadedFile: req.file ? req.file.path : null
+    });
 
-// Routes
+    const savedForm = await formData.save();
+  // const emailSent = await sendMail(savedForm, req.file ? req.file.path : null);
 
-const formRoutes = require('./routes/formRoutes');
-app.use('/api/forms', formRoutes); // Mount the form routes
+    res.status(200).json({
+      message: 'Form submitted successfully',
+      emailStatus: 'Email sending failed',
+      formData: savedForm
+    });
+  } catch (error) {
+    console.error('Error processing form submission:', error);
+    res.status(500).json({
+      message: 'Error submitting form',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
 
-// Define the hardcoded dropdown options
-const dropdownOptions = [
-    { key: 'option1', value: 'Option 1' },
-    { key: 'option2', value: 'Option 2' },
-    { key: 'option3', value: 'Option 3' },
-    { key: 'option4', value: 'Option 4' }
-  ];
-  
-  // API to return dropdown options
-  app.get('/api/dropdowns/options', (req, res) => {
-    res.json({ success: true, data: dropdownOptions });
-  });
+app.get('/api/forms', async (req, res) => {
+  try {
+    const forms = await Form.find();
+    res.json(forms);
+  } catch (error) {
+    console.error('Error retrieving forms:', error);
+    res.status(500).json({ message: 'Error retrieving forms' });
+  }
+});
 
-  app.get("/", (  req, res) => {
-    res.send("API health ok")
-  })
-  
-// Get the port from environment variables or use default port 5000
-const PORT = process.env.PORT || 5000;
 
-// Start the server
+// Start server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
