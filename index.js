@@ -154,9 +154,31 @@ app.get('/api/forms', async (req, res) => {
   }
 });
 
+app.get('/api/forms/:id/download', async (req, res) => {
+  try {
+    const form = await Form.findById(req.params.id);
+    if (!form || !form.uploadedFile) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    // Set the appropriate headers
+    res.set({
+      'Content-Type': form.uploadedFile.contentType,
+      'Content-Disposition': `attachment; filename="${form.uploadedFile.filename}"`,
+    });
+
+    // Send the file data
+    res.send(form.uploadedFile.data);
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    res.status(500).json({ message: 'Error downloading file' });
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('OK working');
 });
+
 
 // Start server
 const PORT = process.env.PORT || 3000;
