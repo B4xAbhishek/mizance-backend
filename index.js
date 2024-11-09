@@ -1,9 +1,7 @@
-// index.js
 const express = require('express');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
-const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -39,18 +37,31 @@ const formSchema = new mongoose.Schema({
   contactTime: { type: String, default: null },
   projectType: { type: String, default: null },
   projectDescription: { type: String, default: null },
-  uploadedFile: { type: mongoose.Schema.Types.Mixed, default: null },
+  uploadedFile: {
+    data: Buffer,
+    contentType: String,
+    filename: String
+  }
 }, { timestamps: true });
 
 formSchema.pre('save', function (next) {
-  console.log('Data being saved:', JSON.stringify(this.toObject(), null, 2));
+  const dataToLog = { ...this.toObject() };
+  if (dataToLog.uploadedFile && dataToLog.uploadedFile.data) {
+    dataToLog.uploadedFile.data = '<Buffer>';
+  }
+  console.log('Data being saved:', JSON.stringify(dataToLog, null, 2));
   next();
 });
 
 const Form = mongoose.models.Form || mongoose.model('Form', formSchema);
 
-// File upload setup
-const upload = multer({ dest: 'uploads/' });
+// Configure multer to use memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // Nodemailer configuration
 const transporter = nodemailer.createTransport({
@@ -61,7 +72,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-const sendMail = async (formData, attachmentPath) => {
+const sendMail = async (formData) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: 'b4xabhishek@gmail.com',
@@ -79,11 +90,10 @@ const sendMail = async (formData, attachmentPath) => {
       Project Details:
       Type: ${formData.projectType}
       Description: ${formData.projectDescription}
-
     `,
-    attachments: attachmentPath ? [{
-      filename: path.basename(attachmentPath),
-      path: attachmentPath
+    attachments: formData.uploadedFile ? [{
+      filename: formData.uploadedFile.filename,
+      content: formData.uploadedFile.data
     }] : []
   };
 
@@ -102,16 +112,26 @@ app.post('/api/forms/submit', upload.single('uploadedFile'), async (req, res) =>
   try {
     const formData = new Form({
       ...req.body,
-      uploadedFile: req.file ? req.file.path : null
+      uploadedFile: req.file ? {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+        filename: req.file.originalname
+      } : null
     });
 
     const savedForm = await formData.save();
-  // const emailSent = await sendMail(savedForm, req.file ? req.file.path : null);
+    const emailSent = await sendMail(savedForm);
 
     res.status(200).json({
       message: 'Form submitted successfully',
-      emailStatus: 'Email sending failed',
-      formData: savedForm
+      emailStatus: emailSent ? 'Email sent successfully' : 'Email sending failed',
+      formData: {
+        ...savedForm.toObject(),
+        uploadedFile: savedForm.uploadedFile ? {
+          filename: savedForm.uploadedFile.filename,
+          contentType: savedForm.uploadedFile.contentType
+        } : null
+      }
     });
   } catch (error) {
     console.error('Error processing form submission:', error);
@@ -124,7 +144,9 @@ app.post('/api/forms/submit', upload.single('uploadedFile'), async (req, res) =>
 
 app.get('/api/forms', async (req, res) => {
   try {
-    const forms = await Form.find();
+    const forms = await Form.find({}, {
+      'uploadedFile.data': 0 // Exclude file data from the response
+    });
     res.json(forms);
   } catch (error) {
     console.error('Error retrieving forms ->', error);
