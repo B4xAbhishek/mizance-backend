@@ -48,7 +48,6 @@ formSchema.pre('save', function (next) {
 });
 
 const Form = mongoose.models.Form || mongoose.model('Form', formSchema);
-rgr
 
 // File upload setup
 const upload = multer({ dest: 'uploads/' });
@@ -128,13 +127,13 @@ app.get('/api/forms', async (req, res) => {
     const forms = await Form.find();
     res.json(forms);
   } catch (error) {
-    console.error('Error retrieving forms:', error);
+    console.error('Error retrieving forms ->', error);
     res.status(500).json({ message: 'Error retrieving forms' });
   }
 });
 
 app.get('/', (req, res) => {
-  res.send('OK');
+  res.send('OK working');
 });
 
 // Start server
