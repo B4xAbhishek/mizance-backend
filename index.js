@@ -47,7 +47,8 @@ formSchema.pre('save', function (next) {
   next();
 });
 
-const Form = mongoose.model('MizanceForm', formSchema);
+const Form = mongoose.models.Form || mongoose.model('Form', formSchema);
+rgr
 
 // File upload setup
 const upload = multer({ dest: 'uploads/' });
