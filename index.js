@@ -132,6 +132,9 @@ app.get('/api/forms', async (req, res) => {
   }
 });
 
+app.get('/', (req, res) => {
+  res.send('OK');
+});
 
 // Start server
 const PORT = process.env.PORT || 3000;
