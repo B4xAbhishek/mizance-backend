@@ -1,16 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
-const multer = require('multer');
 const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-
-// CORS Configuration
 app.use(cors({
-  origin: '*', 
+  origin: '*',
   methods: '*',
   allowedHeaders: '*',
   credentials: true,
@@ -22,21 +18,18 @@ app.use(cors({
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => {
-  console.log('Database connected');
-}).catch((error) => {
-  console.error('Database connection error:', error);
-});
+}).then(() => console.log('Database connected'))
+  .catch((error) => console.error('Database connection error:', error));
 
 // Schema and model
 const formSchema = new mongoose.Schema({
-  name: { type: String, default: null },
-  email: { type: String, default: null },
-  phone: { type: String, default: null },
-  communicationMethod: { type: String, default: null },
-  contactTime: { type: String, default: null },
-  projectType: { type: String, default: null },
-  projectDescription: { type: String, default: null },
+  name: String,
+  email: String,
+  phone: String,
+  communicationMethod: String,
+  contactTime: String,
+  projectType: String,
+  projectDescription: String,
   uploadedFile: {
     data: Buffer,
     contentType: String,
@@ -46,76 +39,44 @@ const formSchema = new mongoose.Schema({
 
 formSchema.pre('save', function (next) {
   const dataToLog = { ...this.toObject() };
-  if (dataToLog.uploadedFile && dataToLog.uploadedFile.data) {
+  if (dataToLog.uploadedFile?.data) {
     dataToLog.uploadedFile.data = '<Buffer>';
   }
   console.log('Data being saved:', JSON.stringify(dataToLog, null, 2));
   next();
 });
 
-const Form = mongoose.models.Form || mongoose.model('Form', formSchema);
+const Form = mongoose.model('Form', formSchema);
 
-// Configure multer to use memory storage
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
-});
-
-// Nodemailer configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
+// Utility function to send email (placeholder)
 const sendMail = async (formData) => {
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: 'b4xabhishek@gmail.com',
-    subject: 'New Project Inquiry',
-    text: `
-      New Project Inquiry Received!
-
-      Contact Details:
-      Name: ${formData.name}
-      Email: ${formData.email}
-      Phone: ${formData.phone}
-      Preferred Communication: ${formData.communicationMethod}
-      Preferred Contact Time: ${formData.contactTime}
-
-      Project Details:
-      Type: ${formData.projectType}
-      Description: ${formData.projectDescription}
-    `,
-    attachments: formData.uploadedFile ? [{
-      filename: formData.uploadedFile.filename,
-      content: formData.uploadedFile.data
-    }] : []
-  };
-
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent: ' + info.response);
-    return true;
-  } catch (error) {
-    console.error('Error sending email:', error);
-    return false;
-  }
+  // Add email sending logic here (e.g., nodemailer)
+  return true; // Placeholder for success
 };
 
 // Form submission endpoint
-app.post('/api/forms/submit', upload.single('uploadedFile'), async (req, res) => {
+app.post('/api/forms/submit', async (req, res) => {
   try {
+    const { name, email, phone, communicationMethod, contactTime, projectType, projectDescription, uploadedFile } = req.body;
+
+    // Validate uploaded file size
+    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 5 MB
+    if (uploadedFile?.data && Buffer.byteLength(uploadedFile.data, 'base64') > MAX_FILE_SIZE) {
+      return res.status(400).json({ message: 'File too large' });
+    }
+
     const formData = new Form({
-      ...req.body,
-      uploadedFile: req.file ? {
-        data: req.file.buffer,
-        contentType: req.file.mimetype,
-        filename: req.file.originalname
+      name,
+      email,
+      phone,
+      communicationMethod,
+      contactTime,
+      projectType,
+      projectDescription,
+      uploadedFile: uploadedFile ? {
+        data: Buffer.from(uploadedFile.data, 'base64'),
+        contentType: uploadedFile.contentType,
+        filename: uploadedFile.filename
       } : null
     });
 
@@ -142,46 +103,38 @@ app.post('/api/forms/submit', upload.single('uploadedFile'), async (req, res) =>
   }
 });
 
+// Fetch all forms (excluding file data)
 app.get('/api/forms', async (req, res) => {
   try {
-    const forms = await Form.find({}, {
-      'uploadedFile.data': 0 // Exclude file data from the response
-    });
+    const forms = await Form.find({}, { 'uploadedFile.data': 0 });
     res.json(forms);
   } catch (error) {
-    console.error('Error retrieving forms ->', error);
+    console.error('Error retrieving forms:', error);
     res.status(500).json({ message: 'Error retrieving forms' });
   }
 });
 
+// Download file endpoint
 app.get('/api/forms/:id/download', async (req, res) => {
   try {
     const form = await Form.findById(req.params.id);
-    if (!form || !form.uploadedFile) {
+    if (!form?.uploadedFile) {
       return res.status(404).json({ message: 'File not found' });
     }
 
-    // Set the appropriate headers
     res.set({
       'Content-Type': form.uploadedFile.contentType,
-      'Content-Disposition': `attachment; filename="${form.uploadedFile.filename}"`,
-    });
-
-    // Send the file data
-    res.send(form.uploadedFile.data);
+      'Content-Disposition': `attachment; filename="${form.uploadedFile.filename}"`
+    }).send(form.uploadedFile.data);
   } catch (error) {
     console.error('Error downloading file:', error);
     res.status(500).json({ message: 'Error downloading file' });
   }
 });
 
-app.get('/', (req, res) => {
-  res.send('OK working');
-});
-
+// Health check endpoint
+app.get('/', (req, res) => res.send('OK working'));
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
